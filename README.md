@@ -21,7 +21,10 @@ A basketball scoreboard from firmware to dashboard. Software only, no hardware.
 |-------|------|--------|
 | 1 | C engine (`engine/`) | **Done** - `make test` passes (49 checks); CLI, state.json and events.log smoke-tested on Windows (MSYS2 UCRT64 gcc); also builds on Ubuntu, and `--device /dev/scoreboard` verified there. |
 | 2 | Linux kernel module (`kernel/`) | **Done** - built and loaded on Ubuntu 26.04 VM (kernel 7.0.0-38-generic): insmod, dmesg, `crw-rw-rw-` device, echo/cat round trip, engine `--device` writes, rmmod all verified |
-| 3 | Python bridge (`bridge/`) | **Done** - tested on Windows (Python 3.13) against a mock HTTP server: state.json fallback, device preferred when present (stand-in file), empty/half-written JSON skipped, server down handled. Reading the real `/dev/scoreboard` is verified only in the end-to-end VM run (see Layer 4). |
+| 3 | Python bridge (`bridge/`) | **Done** - tested on Windows (Python 3.13) against a mock HTTP server: state.json fallback, device preferred when present (stand-in file), empty/half-written JSON skipped, server down handled. Reading the real `/dev/scoreboard` verified in the full VM run below. |
+
+**Full chain verified:** engine in an Ubuntu VM (`--device /dev/scoreboard`) -> kernel module -> bridge in the VM
+-> Express API on the Windows host -> React dashboard in a Windows browser, updating live.
 | 4 | Express + React dashboard (`web/`) | **Done** - API tests pass (5/5, `npm test`); `vite build` succeeds; full pipeline engine -> state.json -> bridge -> API -> dashboard verified live on Windows (desktop and phone width, waiting/live/offline states). |
 
 ## Layer 1: build and run
@@ -88,8 +91,12 @@ and POSTs it to the web server. If the server is down it prints an error and ret
 
 ```
 python bridge/bridge.py                       # defaults: http://localhost:3000/api/state
-python bridge/bridge.py --url http://10.0.2.2:3000/api/state   # from a VirtualBox VM to the Windows host
+python3 bridge/bridge.py --url 192.168.0.103:3000   # from a VM: host's LAN IP (/api/state is added)
 ```
+
+VirtualBox 7 NAT blocks VMs from reaching the host's `localhost` via `10.0.2.2` by default.
+Use the host's LAN IP (`ipconfig` on Windows), or power the VM off and run
+`VBoxManage modifyvm <vm> --nat-localhostreachable1 on` to allow `10.0.2.2`.
 
 Options: `--url`, `--device` (default `/dev/scoreboard`), `--state` (default `engine/state.json`), `--interval` (seconds).
 
@@ -116,6 +123,18 @@ API (CORS enabled):
 The page polls both GET endpoints every second and shows score, game clock, shot clock
 (red at 5 or less), quarter, state, team fouls, timeouts, penalty and violation tags,
 and the events feed. The pill at the top shows `waiting` / `live` / `offline`.
+
+## Run everything with the kernel module (VM + Windows)
+
+```
+# Windows
+cd web && npm run server
+cd web && npm run dev                         # open http://localhost:5173
+# Ubuntu VM
+cd kernel && make && sudo insmod scoreboard.ko
+cd engine && make && ./courtsync --device /dev/scoreboard
+python3 bridge/bridge.py --url <windows-LAN-IP>:3000
+```
 
 ## Run everything (Windows only, no kernel module)
 
