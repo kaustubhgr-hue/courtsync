@@ -2,6 +2,9 @@
 
 A basketball scoreboard from firmware to dashboard. Software only, no hardware.
 
+**Live demo:** https://courtsync-ihrh.onrender.com - the real C engine playing a simulated game
+(free hosting: the first visit after ~15 min idle takes up to a minute to wake up).
+
 ```
  +-----------+  state.json   +--------+  POST /api/state  +------------+  poll 1s  +--------+
  | C engine  |-------------->| bridge |------------------>| Express    |<----------| React  |
@@ -125,6 +128,9 @@ The page polls both GET endpoints every second and shows score, game clock, shot
 and the events feed. The pill at the top shows `waiting` / `live` / `offline`.
 
 ## Hosted demo (Render)
+
+Deployed and verified at https://courtsync-ihrh.onrender.com (page served, demo ticking once a
+second, unauthenticated POST rejected with 401).
 
 `render.yaml` deploys one free Render web service: it compiles the C engine, builds the
 React page, and runs `web/server.js`, which serves both the API and the page.
