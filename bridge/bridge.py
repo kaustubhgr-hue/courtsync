@@ -4,12 +4,14 @@ Source: /dev/scoreboard (kernel module). If that device doesn't exist,
 falls back to engine/state.json. Uses only the Python standard library.
 
 Usage: python bridge.py [--url URL] [--device PATH] [--state PATH] [--interval SECS]
+--url may be just the server address (e.g. 192.168.0.103:3000); /api/state is added.
 """
 import argparse
 import json
 import os
 import time
 import urllib.error
+import urllib.parse
 import urllib.request
 
 HERE = os.path.dirname(os.path.abspath(__file__))
@@ -34,6 +36,15 @@ def read_state(device, state_file):
         return path, None
 
 
+def full_url(url):
+    """Accept 'http://host:3000' or a full URL; add /api/state when no path is given."""
+    if "://" not in url:
+        url = "http://" + url
+    if urllib.parse.urlparse(url).path in ("", "/"):
+        url = url.rstrip("/") + "/api/state"
+    return url
+
+
 def post_state(url, state):
     """POST state as JSON. Returns the HTTP status code; raises on network errors."""
     body = json.dumps(state).encode("utf-8")
@@ -50,6 +61,7 @@ def main():
     p.add_argument("--state", default=DEFAULT_STATE)
     p.add_argument("--interval", type=float, default=1.0)
     args = p.parse_args()
+    args.url = full_url(args.url)
 
     print(f"bridge: device={args.device} fallback={args.state} -> {args.url}")
     while True:
@@ -59,8 +71,10 @@ def main():
                 status = post_state(args.url, state)
                 print(f"posted from {source}: HTTP {status}  "
                       f"Q{state.get('quarter')} {state.get('state')} clock {state.get('clock')}")
+            except urllib.error.HTTPError as e:              # server answered, but with an error
+                print(f"post rejected by {args.url}: HTTP {e.code}")
             except (urllib.error.URLError, OSError) as e:
-                print(f"post failed (server down?): {e}")   # keep running, retry next tick
+                print(f"post failed (server down?) {args.url}: {e}")   # keep running, retry next tick
         time.sleep(args.interval)
 
 
