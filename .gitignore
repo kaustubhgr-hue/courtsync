@@ -3,5 +3,14 @@ engine/courtsync
 engine/test_runner
 state.json
 events.log
+# kernel build output
+*.o
+*.ko
+*.mod
+*.mod.c
+.*.cmd
+Module.symvers
+modules.order
+.tmp_versions/
 node_modules/
 dist/

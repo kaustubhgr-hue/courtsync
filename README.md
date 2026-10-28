@@ -19,8 +19,8 @@ A basketball scoreboard from firmware to dashboard. Software only, no hardware.
 
 | Layer | What | Status |
 |-------|------|--------|
-| 1 | C engine (`engine/`) | **Done** - `make test` passes (49 checks); CLI, state.json and events.log smoke-tested on Windows (MSYS2 UCRT64 gcc). `--device` not tested yet (needs Layer 2). |
-| 2 | Linux kernel module (`kernel/`) | Planned |
+| 1 | C engine (`engine/`) | **Done** - `make test` passes (49 checks); CLI, state.json and events.log smoke-tested on Windows (MSYS2 UCRT64 gcc); also builds on Ubuntu, and `--device /dev/scoreboard` verified there. |
+| 2 | Linux kernel module (`kernel/`) | **Done** - built and loaded on Ubuntu 26.04 VM (kernel 7.0.0-38-generic): insmod, dmesg, `crw-rw-rw-` device, echo/cat round trip, engine `--device` writes, rmmod all verified |
 | 3 | Python bridge (`bridge/`) | Planned |
 | 4 | Express + React dashboard (`web/`) | Planned |
 
@@ -41,3 +41,41 @@ Commands: `start`, `pause`, `tick [n]`, `score <home|away> <pts>`, `foul <home|a
 
 Options: `--state <file>` (default `state.json`), `--log <file>` (default `events.log`),
 `--device <path>` (also write the state line to that file, for Layer 2).
+
+## Layer 2: kernel module (Linux VM only)
+
+`kernel/scoreboard.c` registers a misc character device `/dev/scoreboard`.
+A write replaces the stored state (max 4096 bytes, bigger writes get `EINVAL`);
+a read returns the latest state. A mutex guards the buffer.
+
+Target: Ubuntu 26.04 in VirtualBox (Secure Boot off). Setup once:
+
+```
+sudo apt install -y build-essential git
+sudo apt install -y linux-headers-$(uname -r)
+```
+
+Build, load, test, unload:
+
+```
+cd kernel
+make                              # produces scoreboard.ko
+sudo insmod scoreboard.ko
+sudo dmesg | tail -3              # "scoreboard: loaded, /dev/scoreboard ready"
+ls -l /dev/scoreboard             # crw-rw-rw- 1 root root 10, <minor> ...
+echo '{"test":1}' > /dev/scoreboard
+cat /dev/scoreboard               # {"test":1}
+sudo rmmod scoreboard
+sudo dmesg | tail -1              # "scoreboard: unloaded"
+```
+
+Engine -> device:
+
+```
+cd engine && make
+./courtsync --device /dev/scoreboard     # type: start, tick 5, score home 2
+cat /dev/scoreboard                      # (second terminal) shows the engine's JSON
+```
+
+`dmesg` may also show "loading out-of-tree module taints kernel" and
+"module verification failed" - both are normal for a self-built, unsigned module.
