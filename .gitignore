@@ -1,0 +1,7 @@
+*.exe
+engine/courtsync
+engine/test_runner
+state.json
+events.log
+node_modules/
+dist/
