@@ -1,0 +1,71 @@
+"""bridge.py - reads the scoreboard state once a second and POSTs it to the web server.
+
+Source: /dev/scoreboard (kernel module). If that device doesn't exist,
+falls back to engine/state.json. Uses only the Python standard library.
+
+Usage: python bridge.py [--url URL] [--device PATH] [--state PATH] [--interval SECS]
+"""
+import argparse
+import json
+import os
+import time
+import urllib.error
+import urllib.request
+
+HERE = os.path.dirname(os.path.abspath(__file__))
+DEFAULT_STATE = os.path.normpath(os.path.join(HERE, "..", "engine", "state.json"))
+
+
+def read_state(device, state_file):
+    """Return (source_path, parsed_json) or (source_path, None) if nothing valid to send."""
+    path = device if os.path.exists(device) else state_file
+    try:
+        with open(path, "r", encoding="utf-8") as f:
+            text = f.read().strip()
+    except OSError as e:
+        print(f"read failed: {path}: {e}")
+        return path, None
+    if not text:
+        return path, None                  # device loaded but engine hasn't written yet
+    try:
+        return path, json.loads(text)      # validate so we never post a half-written file
+    except json.JSONDecodeError:
+        print(f"skipping invalid JSON from {path}")
+        return path, None
+
+
+def post_state(url, state):
+    """POST state as JSON. Returns the HTTP status code; raises on network errors."""
+    body = json.dumps(state).encode("utf-8")
+    req = urllib.request.Request(url, data=body, method="POST",
+                                 headers={"Content-Type": "application/json"})
+    with urllib.request.urlopen(req, timeout=3) as resp:
+        return resp.status
+
+
+def main():
+    p = argparse.ArgumentParser(description="CourtSync bridge")
+    p.add_argument("--url", default="http://localhost:3000/api/state")
+    p.add_argument("--device", default="/dev/scoreboard")
+    p.add_argument("--state", default=DEFAULT_STATE)
+    p.add_argument("--interval", type=float, default=1.0)
+    args = p.parse_args()
+
+    print(f"bridge: device={args.device} fallback={args.state} -> {args.url}")
+    while True:
+        source, state = read_state(args.device, args.state)
+        if state is not None:
+            try:
+                status = post_state(args.url, state)
+                print(f"posted from {source}: HTTP {status}  "
+                      f"Q{state.get('quarter')} {state.get('state')} clock {state.get('clock')}")
+            except (urllib.error.URLError, OSError) as e:
+                print(f"post failed (server down?): {e}")   # keep running, retry next tick
+        time.sleep(args.interval)
+
+
+if __name__ == "__main__":
+    try:
+        main()
+    except KeyboardInterrupt:
+        print("bridge stopped")

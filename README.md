@@ -21,7 +21,7 @@ A basketball scoreboard from firmware to dashboard. Software only, no hardware.
 |-------|------|--------|
 | 1 | C engine (`engine/`) | **Done** - `make test` passes (49 checks); CLI, state.json and events.log smoke-tested on Windows (MSYS2 UCRT64 gcc); also builds on Ubuntu, and `--device /dev/scoreboard` verified there. |
 | 2 | Linux kernel module (`kernel/`) | **Done** - built and loaded on Ubuntu 26.04 VM (kernel 7.0.0-38-generic): insmod, dmesg, `crw-rw-rw-` device, echo/cat round trip, engine `--device` writes, rmmod all verified |
-| 3 | Python bridge (`bridge/`) | Planned |
+| 3 | Python bridge (`bridge/`) | **Done** - tested on Windows (Python 3.13) against a mock HTTP server: state.json fallback, device preferred when present (stand-in file), empty/half-written JSON skipped, server down handled. Reading the real `/dev/scoreboard` is verified only in the end-to-end VM run (see Layer 4). |
 | 4 | Express + React dashboard (`web/`) | Planned |
 
 ## Layer 1: build and run
@@ -79,3 +79,16 @@ cat /dev/scoreboard                      # (second terminal) shows the engine's 
 
 `dmesg` may also show "loading out-of-tree module taints kernel" and
 "module verification failed" - both are normal for a self-built, unsigned module.
+
+## Layer 3: bridge
+
+Standard library only, no pip install. Every second it reads `/dev/scoreboard`
+(or `engine/state.json` if the device doesn't exist), checks it is valid JSON,
+and POSTs it to the web server. If the server is down it prints an error and retries.
+
+```
+python bridge/bridge.py                       # defaults: http://localhost:3000/api/state
+python bridge/bridge.py --url http://10.0.2.2:3000/api/state   # from a VirtualBox VM to the Windows host
+```
+
+Options: `--url`, `--device` (default `/dev/scoreboard`), `--state` (default `engine/state.json`), `--interval` (seconds).
