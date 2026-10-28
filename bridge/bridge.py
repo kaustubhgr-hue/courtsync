@@ -3,7 +3,7 @@
 Source: /dev/scoreboard (kernel module). If that device doesn't exist,
 falls back to engine/state.json. Uses only the Python standard library.
 
-Usage: python bridge.py [--url URL] [--device PATH] [--state PATH] [--interval SECS]
+Usage: python bridge.py [--url URL] [--device PATH] [--state PATH] [--interval SECS] [--token T]
 --url may be just the server address (e.g. 192.168.0.103:3000); /api/state is added.
 """
 import argparse
@@ -45,11 +45,13 @@ def full_url(url):
     return url
 
 
-def post_state(url, state):
+def post_state(url, state, token=None):
     """POST state as JSON. Returns the HTTP status code; raises on network errors."""
     body = json.dumps(state).encode("utf-8")
-    req = urllib.request.Request(url, data=body, method="POST",
-                                 headers={"Content-Type": "application/json"})
+    headers = {"Content-Type": "application/json"}
+    if token:
+        headers["X-Token"] = token         # required by a hosted server that has POST_TOKEN set
+    req = urllib.request.Request(url, data=body, method="POST", headers=headers)
     with urllib.request.urlopen(req, timeout=3) as resp:
         return resp.status
 
@@ -60,6 +62,8 @@ def main():
     p.add_argument("--device", default="/dev/scoreboard")
     p.add_argument("--state", default=DEFAULT_STATE)
     p.add_argument("--interval", type=float, default=1.0)
+    p.add_argument("--token", default=os.environ.get("COURTSYNC_TOKEN"),
+                   help="X-Token for a hosted server (or set COURTSYNC_TOKEN)")
     args = p.parse_args()
     args.url = full_url(args.url)
 
@@ -68,7 +72,7 @@ def main():
         source, state = read_state(args.device, args.state)
         if state is not None:
             try:
-                status = post_state(args.url, state)
+                status = post_state(args.url, state, args.token)
                 print(f"posted from {source}: HTTP {status}  "
                       f"Q{state.get('quarter')} {state.get('state')} clock {state.get('clock')}")
             except urllib.error.HTTPError as e:              # server answered, but with an error

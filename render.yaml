@@ -1,0 +1,17 @@
+# Render Blueprint: one free web service that builds the C engine and the dashboard,
+# then runs the Express server in demo mode. Deploy: Render dashboard -> New -> Blueprint -> this repo.
+services:
+  - type: web
+    name: courtsync
+    runtime: node
+    plan: free
+    buildCommand: cd engine && make && cd ../web && npm ci --include=dev && npm run build
+    startCommand: cd web && node server.js
+    healthCheckPath: /api/events
+    envVars:
+      - key: NODE_VERSION
+        value: "24"
+      - key: DEMO
+        value: "1"
+      - key: POST_TOKEN          # random secret; copy it from Render's Environment tab to post from the bridge
+        generateValue: true

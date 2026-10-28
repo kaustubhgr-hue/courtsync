@@ -50,6 +50,21 @@ test("events are de-duplicated by seq and returned newest first", async () => {
   assert.deepEqual(ev.map((e) => e.seq), [4, 3, 2, 1]);
 });
 
+test("POST requires X-Token when a token is configured", async () => {
+  const s = createApp({ token: "secret" }).listen(0);
+  await new Promise((r) => s.once("listening", r));
+  const url = `http://127.0.0.1:${s.address().port}/api/state`;
+  const send = (headers) => fetch(url, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", ...headers },
+    body: JSON.stringify(state([1])),
+  });
+  assert.equal((await send({})).status, 401);
+  assert.equal((await send({ "X-Token": "wrong" })).status, 401);
+  assert.equal((await send({ "X-Token": "secret" })).status, 200);
+  s.close();
+});
+
 test("engine restart (seq goes backwards) clears old events", async () => {
   await post(state([1]));
   const ev = await (await fetch(`${base}/api/events`)).json();

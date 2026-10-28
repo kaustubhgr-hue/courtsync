@@ -1,8 +1,9 @@
 // App.jsx - polls the API every second and shows the scoreboard and event feed.
 import { useEffect, useState } from "react";
 
-// API runs on port 3000 of the same machine that served this page.
-const API = `http://${window.location.hostname}:3000`;
+// In development (Vite on :5173) the API is on port 3000 of the same machine.
+// In production the Express server serves this page itself, so the API is same-origin.
+const API = import.meta.env.DEV ? `http://${window.location.hostname}:3000` : "";
 
 // Same bit flags as engine/include/scoreboard.h
 const FLAG_SHOT_VIOLATION = 1 << 2;
@@ -63,7 +64,7 @@ export default function App() {
       {!game ? (
         <p className="empty">
           {conn === "offline"
-            ? `Can't reach the server at ${API}. Is "npm run server" running?`
+            ? `Can't reach the server${API ? ` at ${API}` : ""}. Is "npm run server" running?`
             : "Waiting for the first state from the bridge..."}
         </p>
       ) : (

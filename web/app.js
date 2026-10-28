@@ -4,7 +4,8 @@ import cors from "cors";
 
 const MAX_EVENTS = 100;
 
-export function createApp() {
+// token: if set, POST /api/state must send it in the X-Token header (so strangers can't post scores).
+export function createApp({ token } = {}) {
   const app = express();
   app.use(cors());                 // let the Vite page (different port) call this API
   app.use(express.json());
@@ -15,6 +16,9 @@ export function createApp() {
 
   // Bridge posts the full engine state here every second.
   app.post("/api/state", (req, res) => {
+    if (token && req.get("x-token") !== token) {
+      return res.status(401).json({ error: "missing or wrong X-Token" });
+    }
     const s = req.body;
     if (!s || typeof s !== "object" || !Array.isArray(s.teams) || !Array.isArray(s.events)) {
       return res.status(400).json({ error: "expected engine state JSON" });
