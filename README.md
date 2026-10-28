@@ -5,6 +5,22 @@ A basketball scoreboard from firmware to dashboard. Software only, no hardware.
 **Live demo:** https://courtsync-ihrh.onrender.com - the real C engine playing a simulated game
 (free hosting: the first visit after ~15 min idle takes up to a minute to wake up).
 
+## Screenshots
+
+**Live dashboard** - the hosted demo, with the C engine running a simulated game on the server:
+
+![Live CourtSync dashboard on Render](docs/live-demo-render.png)
+
+**Full chain, VM to browser** - in an Ubuntu VM the kernel module is loaded, the engine writes to
+`/dev/scoreboard`, and the bridge posts each state to the Windows host's API:
+
+![Ubuntu VM: kernel module loaded, engine writing to /dev/scoreboard](docs/vm-engine-and-kernel.png)
+
+The commands typed above (`start`, `tick 5`, `score home 2`, `foul away 3`) show up on the
+Windows dashboard within about a second:
+
+![Dashboard on the Windows host showing the VM's game](docs/vm-to-dashboard.png)
+
 ```
  +-----------+  state.json   +--------+  POST /api/state  +------------+  poll 1s  +--------+
  | C engine  |-------------->| bridge |------------------>| Express    |<----------| React  |
